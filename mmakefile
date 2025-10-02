@@ -1,0 +1,2 @@
+a.txt: A.txt
+    touch a.txt
