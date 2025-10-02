@@ -23,11 +23,6 @@ int main(int argc, char *argv[]) {
             case 'f':
                 printf("Found flag 'f' and filename %s\n", optarg);
                 fp = fopen(optarg, "r");
-                if (fp == NULL) {
-                    perror("fopen failed");
-                    exit(EXIT_FAILURE);
-                }
-                printf("Opened file: %s\n", optarg);
                 break;
             case 'B':
                 printf("Found flag 'B'\n");
@@ -46,6 +41,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    printf("custom makefile = TRUE\n");
     printf("%p\n",fp);
     mmakefile = parse_makefile(fp);
     if(mmakefile != NULL) {
@@ -54,5 +50,6 @@ int main(int argc, char *argv[]) {
     } else {
         printf("Makefile = NULL\n");
     }
+
     return 0;
 }
