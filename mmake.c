@@ -66,7 +66,10 @@ int main(int argc, char *argv[]) {
 			handle_target(defaultTarget, mmakefile, fB, sC, fp);
 		}
     } else {
-        printf("Makefile = NULL\n");
+        printf("Failed to parse makefile.\n");
+		makefile_del(mmakefile);
+		fclose(fp);
+		exit(EXIT_FAILURE);
     }
 	makefile_del(mmakefile);
 	fclose(fp);
