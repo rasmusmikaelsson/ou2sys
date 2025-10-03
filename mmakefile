@@ -1,2 +1,8 @@
-A.test: a.test
+A.test: a.test t.test
 	touch A.test
+
+a.test:
+	touch B.test
+
+t.test: 
+	touch T.test
