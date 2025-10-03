@@ -18,8 +18,8 @@ int updated_prereq(const char *target, const char **rule_prereq, makefile *mmake
 void exec_args(char **args, makefile *mmakefile);
 
 #define ERR "\e[0;31m";
-#define GRN "\e[0;32m"r
-#define YEL "\e[0;33m"
+#define GRN "\e[0;32m";
+#define YEL "\e[0;33m";
 #define RESET "\e[0m";
 
 
