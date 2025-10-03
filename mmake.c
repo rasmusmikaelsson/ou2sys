@@ -11,11 +11,11 @@
 #define FALSE 0;
 #define TRUE 1;
 
-int handle_target(const char *target, makefile *mmakefile, int fB, int sC);
-void rebuild(const char *target, char **args, int sC, makefile *mmakefile);
+int handle_target(const char *target, makefile *mmakefile, int fB, int sC, FILE *fp);
+void rebuild(const char *target, char **args, int sC, makefile *mmakefile, FILE *fp);
 int file_exists(const char *target);
-int updated_prereq(const char *target, const char **rule_prereq, makefile *mmakefile);
-void exec_args(char **args, makefile *mmakefile);
+int updated_prereq(const char *target, const char **rule_prereq, makefile *mmakefile, FILE *fp);
+void exec_args(char **args, makefile *mmakefile, FILE *fp);
 
 #define ERR "\e[0;31m";
 #define GRN "\e[0;32m";
@@ -55,18 +55,25 @@ int main(int argc, char *argv[]) {
 
     mmakefile = parse_makefile(fp);
     if(mmakefile != NULL) {
-        defaultTarget = makefile_default_target(mmakefile);
-		handle_target(defaultTarget, mmakefile, fB, sC);
+		int target_specified = 0;
+		for(int i = optind; i < argc ; i++) {
+			target_specified = 1;
+			handle_target(argv[i], mmakefile, fB, sC, fp);
+		}
+
+        if(!target_specified) {
+			defaultTarget = makefile_default_target(mmakefile);
+			handle_target(defaultTarget, mmakefile, fB, sC, fp);
+		}
     } else {
         printf("Makefile = NULL\n");
     }
-	printf("deleting makefile\n");
 	makefile_del(mmakefile);
 	fclose(fp);
     return 0;
 }
 
-int handle_target(const char *target, makefile *mmakefile, int fB, int sC) {
+int handle_target(const char *target, makefile *mmakefile, int fB, int sC, FILE *fp) {
 	rule *currentRule = makefile_rule(mmakefile, target);
 	
 	if(currentRule == NULL) {
@@ -84,18 +91,18 @@ int handle_target(const char *target, makefile *mmakefile, int fB, int sC) {
 	// Loop current rules prereqs and call itself:
 	int index = 0;
 	while(current_rule_prereq[index] != NULL) {
-		handle_target(current_rule_prereq[index], mmakefile, fB, sC);
+		handle_target(current_rule_prereq[index], mmakefile, fB, sC, fp);
 		index++;
 	}
 
 	// Build prject based params
-	if(!file_exists(target) || fB || updated_prereq(target, current_rule_prereq, mmakefile)) {
-		rebuild(target, args, sC, mmakefile);
+	if(!file_exists(target) || fB || updated_prereq(target, current_rule_prereq, mmakefile, fp)) {
+		rebuild(target, args, sC, mmakefile, fp);
 	}
 	return 0;
 }
 
-void rebuild(const char *target, char **args, int sC, makefile *mmakefile) {
+void rebuild(const char *target, char **args, int sC, makefile *mmakefile, FILE *fp) {
 	pid_t pid;
 	int status;
 	
@@ -112,18 +119,20 @@ void rebuild(const char *target, char **args, int sC, makefile *mmakefile) {
 	if(pid < 0) {
 		perror("Fork failed");
 		makefile_del(mmakefile);
+		fclose(fp);
 		exit(EXIT_FAILURE);
 	} else if(pid == 0) {
-		exec_args(args, mmakefile);
+		exec_args(args, mmakefile, fp);
 	}
 
 	wait(&status);
 }
 
-void exec_args(char **args, makefile *mmakefile) {
+void exec_args(char **args, makefile *mmakefile, FILE *fp) {
 	if(execvp(args[0], args) == -1) {
 		perror("execvp failed");
 		makefile_del(mmakefile);
+		fclose(fp);
 		exit(EXIT_FAILURE);
 	}
 }
@@ -138,13 +147,14 @@ int file_exists(const char *target) {
 	return 0;
 }	
 
-int updated_prereq(const char *target, const char **rule_prereq, makefile *mmakefile) {
+int updated_prereq(const char *target, const char **rule_prereq, makefile *mmakefile, FILE *fp) {
 	struct stat target_mtime;
 	struct stat prereq_mtime;
 
 	if(stat(target, &target_mtime) == -1) {
 		perror("stat failed");
 		makefile_del(mmakefile);
+		fclose(fp);
 		exit(EXIT_FAILURE);
 	}
 	
@@ -153,6 +163,7 @@ int updated_prereq(const char *target, const char **rule_prereq, makefile *mmake
 		if(stat(rule_prereq[index], &prereq_mtime) == -1) {
 			perror("stat failed");
 			makefile_del(mmakefile);
+			fclose(fp);
 			exit(EXIT_FAILURE);
 		}
 
