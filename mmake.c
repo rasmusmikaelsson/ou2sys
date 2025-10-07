@@ -12,10 +12,10 @@
 #define TRUE 1;
 
 int handle_target(const char *target, makefile *mmakefile, int fB, int sC, FILE *fp);
-void rebuild(const char *target, char **args, int sC, makefile *mmakefile, FILE *fp);
+int rebuild(char **args, int sC);
 int file_exists(const char *target);
-int updated_prereq(const char *target, const char **rule_prereq, makefile *mmakefile, FILE *fp);
-void exec_args(char **args, makefile *mmakefile, FILE *fp);
+int updated_prereq(const char *target, const char **rule_prereq);
+int exec_args(char **args);
 
 #define ERR "\e[0;31m";
 #define GRN "\e[0;32m";
@@ -27,25 +27,25 @@ int main(int argc, char *argv[]) {
     int sC = FALSE;
     int fB = FALSE;
     makefile *mmakefile;
+	const char *filename = "mmakefile";
     const char *defaultTarget;
 
-    FILE *fp = fopen("mmakefile", "r");
+    FILE *fp;
     int opt;
 
     while((opt = getopt(argc, argv, "f:Bs")) != -1) {
         switch (opt) {
             case 'f':
-				fclose(fp);
-                fp = fopen(optarg, "r");
+				filename = optarg;
                 break;
             case 'B':
                 fB = TRUE;
                 break;
             case 's':
-                sC = TRUE
+                sC = TRUE;
                 break;
             case '?':
-                printf("Unknowed flag..\n");
+                printf("Unknown flag..\n");
                 break;
             default:
                 printf("Error\n");
@@ -53,24 +53,39 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    mmakefile = parse_makefile(fp);
+	fp = fopen(filename, "r");
+	if(fp == NULL) {
+		fprintf(stderr, "No such file or directory\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if((mmakefile = parse_makefile(fp)) == NULL) {
+		fprintf(stderr, "%s: Could not parse makefile\n", filename);
+		fclose(fp);
+		exit(EXIT_FAILURE);
+	} 
+
     if(mmakefile != NULL) {
 		int target_specified = 0;
 		for(int i = optind; i < argc ; i++) {
 			target_specified = 1;
-			handle_target(argv[i], mmakefile, fB, sC, fp);
+			if(handle_target(argv[i], mmakefile, fB, sC, fp) == 1) {
+				makefile_del(mmakefile);
+				fclose(fp);
+				exit(EXIT_FAILURE);
+			}
 		}
 
         if(!target_specified) {
 			defaultTarget = makefile_default_target(mmakefile);
-			handle_target(defaultTarget, mmakefile, fB, sC, fp);
+			if(handle_target(defaultTarget, mmakefile, fB, sC, fp) == 1) {
+				makefile_del(mmakefile);
+				fclose(fp);
+				exit(EXIT_FAILURE);
+			}
 		}
-    } else {
-        printf("Failed to parse makefile.\n");
-		makefile_del(mmakefile);
-		fclose(fp);
-		exit(EXIT_FAILURE);
     }
+
 	makefile_del(mmakefile);
 	fclose(fp);
     return 0;
@@ -81,39 +96,49 @@ int handle_target(const char *target, makefile *mmakefile, int fB, int sC, FILE 
 	
 	if(currentRule == NULL) {
 		if(!file_exists(target)) {
-			printf("%s: is not a file\n", target);
+			fprintf(stderr, "%s: is not a file\n", target);
 			return 1;
 		}
 		return 0;
 	}
-	char **args = rule_cmd(currentRule);
 	
-	// Get current rules prereqs:
 	const char **current_rule_prereq = rule_prereq(currentRule);
 
-	// Loop current rules prereqs and call itself:
+	// Loop current rules prereqs and call itself
 	int index = 0;
 	while(current_rule_prereq[index] != NULL) {
-		handle_target(current_rule_prereq[index], mmakefile, fB, sC, fp);
+		if(handle_target(current_rule_prereq[index], mmakefile, fB, sC, fp) == 1) {
+			return 1;
+		}
 		index++;
 	}
+	int is_updated_prereq = updated_prereq(target, current_rule_prereq);
+	if(is_updated_prereq == 2) {
+		return 1;
+	}
 
-	// Build prject based params
-	if(!file_exists(target) || fB || updated_prereq(target, current_rule_prereq, mmakefile, fp)) {
-		rebuild(target, args, sC, mmakefile, fp);
+	// Build project based params
+	char **args = rule_cmd(currentRule);
+	if(!file_exists(target) || fB || is_updated_prereq) {
+		if(rebuild(args, sC) == 1) {
+			return 1;
+		}
 	}
 	return 0;
 }
 
-void rebuild(const char *target, char **args, int sC, makefile *mmakefile, FILE *fp) {
+int rebuild(char **args, int sC) {
 	pid_t pid;
 	int status;
 	
 	if(!sC) {
 		int index = 0;
 		while(args[index] != NULL) {
-			printf("%s ", args[index]);
-			index++;
+			printf("%s", args[index]);
+			if(args[index + 1] != NULL) {
+				printf(" ");
+			}
+		index++;
 		}
 		printf("\n");
 	}
@@ -121,27 +146,31 @@ void rebuild(const char *target, char **args, int sC, makefile *mmakefile, FILE 
 	pid = fork();
 	if(pid < 0) {
 		perror("Fork failed");
-		makefile_del(mmakefile);
-		fclose(fp);
-		exit(EXIT_FAILURE);
+		return 1;
 	} else if(pid == 0) {
-		exec_args(args, mmakefile, fp);
+		if(exec_args(args) == 1) {
+			return 1;
+		}
 	}
 
 	wait(&status);
+
+	if(WIFEXITED(status) && WEXITSTATUS(status) != EXIT_SUCCESS) {
+		return 1;
+	}
+	return 0;
 }
 
-void exec_args(char **args, makefile *mmakefile, FILE *fp) {
+int exec_args(char **args) {
 	if(execvp(args[0], args) == -1) {
 		perror("execvp failed");
-		makefile_del(mmakefile);
-		fclose(fp);
-		exit(EXIT_FAILURE);
+		return 1;
 	}
+	return 0;
 }
 
 // Checks if a given target is a file
-int file_exists(const char *target) {
+int file_exists(const char *target) {	
 	FILE *check_file = fopen(target, "r");
 	if(check_file) {
 		fclose(check_file);
@@ -150,24 +179,29 @@ int file_exists(const char *target) {
 	return 0;
 }	
 
-int updated_prereq(const char *target, const char **rule_prereq, makefile *mmakefile, FILE *fp) {
+int updated_prereq(const char *target, const char **rule_prereq) {
 	struct stat target_mtime;
 	struct stat prereq_mtime;
-
+	
+	if(!file_exists(target)) {
+		return 1;
+	}
+	
 	if(stat(target, &target_mtime) == -1) {
+		printf("target stat failed\n");
 		perror("stat failed");
-		makefile_del(mmakefile);
-		fclose(fp);
-		exit(EXIT_FAILURE);
+		return 2;
 	}
 	
 	int index = 0;
 	while(rule_prereq[index] != NULL) {
+		if(!file_exists(rule_prereq[index])) {
+			return 1;
+		}
 		if(stat(rule_prereq[index], &prereq_mtime) == -1) {
+			printf("prereq stat failed\n");
 			perror("stat failed");
-			makefile_del(mmakefile);
-			fclose(fp);
-			exit(EXIT_FAILURE);
+			return 2;
 		}
 
 		if(target_mtime.st_mtim.tv_sec < prereq_mtime.st_mtim.tv_sec) {
