@@ -123,6 +123,7 @@ static int updated_prereq(const char *target, const char **rule_prereq) {
 		return 2;
 	}
 	
+	// Check if any of the targets prerequisites are newer than the target
 	int index = 0;
 	while(rule_prereq[index] != NULL) {
 		if(!file_exists(rule_prereq[index])) {
@@ -133,7 +134,7 @@ static int updated_prereq(const char *target, const char **rule_prereq) {
 			perror("stat failed");
 			return 2;
 		}
-
+		// If so, return true 
 		if(target_mtime.st_mtim.tv_sec < prereq_mtime.st_mtim.tv_sec) {
 			return 1;
 		}
@@ -153,6 +154,7 @@ static int rebuild_target(char **args, int sC) {
 	pid_t pid;
 	int status;
 	
+	// Silence commands handling
 	if(!sC) {
 		int index = 0;
 		while(args[index] != NULL) {
@@ -165,6 +167,7 @@ static int rebuild_target(char **args, int sC) {
 		printf("\n");
 	}
 
+	// Forking a new process
 	pid = fork();
 	if(pid < 0) {
 		perror("Fork failed");
@@ -175,8 +178,8 @@ static int rebuild_target(char **args, int sC) {
 		}
 	}
 
+	// Wait for child and handel status
 	wait(&status);
-
 	if(WIFEXITED(status) && WEXITSTATUS(status) != EXIT_SUCCESS) {
 		return 1;
 	}

@@ -43,8 +43,8 @@
  * @return		0 on success, non-zero on error
  */
 int main(int argc, char *argv[]) {
-    int sC = FALSE;
-    int fB = FALSE;
+    int sC = FALSE;			// Silence commands
+    int fB = FALSE;			// Force build
     makefile *mmakefile;
 	const char *filename = "mmakefile";
     const char *defaultTarget;
