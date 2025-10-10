@@ -10,9 +10,9 @@
  *      ./mmake [-f MAKEFILE] [-B] [-s] [TARGET...]
  *
  * Options:
- *      -f MAKEFILE : Use a custom makefile instead of the default "mmakefile".
- *      -B          : Force rebuild all targets, regardless of timestamps.
- *      -s          : Silence command output to stdout.
+ *      -f [MAKEFILE]	: Use a custom makefile instead of the default "mmakefile".
+ *      -B				: Force rebuild all targets, regardless of timestamps.
+ *      -s				: Silence command output to stdout.
  *
  * Targets:
  *      One or more specific targets to build. If no targets are provided,
@@ -87,28 +87,26 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	} 
 
-	// Handel specified target, or default target
-    if(mmakefile != NULL) {
-		int target_specified = FALSE;
+	// Handle specified target, or default target
+	int target_specified = FALSE;
 
-		// Handel specified targets
-		for(int i = optind; i < argc ; i++) {
-			target_specified = TRUE;
-			if(handle_target(argv[i], mmakefile, fB, sC, fp) == 1) {
-				makefile_del(mmakefile);
-				fclose(fp);
-				exit(EXIT_FAILURE);
-			}
+	// Handle specified targets
+	for(int i = optind; i < argc ; i++) {
+		target_specified = TRUE;
+		if(handle_target(argv[i], mmakefile, fB, sC, fp) == 1) {
+			makefile_del(mmakefile);
+			fclose(fp);
+			exit(EXIT_FAILURE);
 		}
+	}
 
-		// If no specified targets, build the default target
-        if(!target_specified) {
-			defaultTarget = makefile_default_target(mmakefile);
-			if(handle_target(defaultTarget, mmakefile, fB, sC, fp) == 1) {
-				makefile_del(mmakefile);
-				fclose(fp);
-				exit(EXIT_FAILURE);
-			}
+	// If no specified targets, build the default target
+	if(!target_specified) {
+		defaultTarget = makefile_default_target(mmakefile);
+		if(handle_target(defaultTarget, mmakefile, fB, sC, fp) == 1) {
+			makefile_del(mmakefile);
+			fclose(fp);
+			exit(EXIT_FAILURE);
 		}
     }
 
