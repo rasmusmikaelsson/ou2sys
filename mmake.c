@@ -27,12 +27,19 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <string.h>
 #include <time.h>
 #include "parser.h"
 #include "target.h"
 
 #define FALSE 0;
 #define TRUE 1;
+
+/* ------------------ Declarations of internal functions ------------------ */
+
+static int parse_commandline(int argc, char **argv, char **filename, int *silence_commands, int *force_build);
+
+/* -------------------------- External functions -------------------------- */
 
 /**
  * Entry point of the program. This function parses command-line arguments, opens and parses the
@@ -42,36 +49,18 @@
  * @param argv	Argument vector
  * @return		0 on success, non-zero on error
  */
-int main(int argc, char *argv[]) {
-    int sC = FALSE;			// Silence commands
-    int fB = FALSE;			// Force build
+int main(int argc, char **argv) {
+    FILE *fp;
+    int silence_commands = FALSE;
+    int force_build = FALSE;
     makefile *mmakefile;
-	const char *filename = "mmakefile";
+	char *filename = "mmakefile";
     const char *defaultTarget;
 
-    FILE *fp;
-    int opt;
-
 	// Parse commandline options
-    while((opt = getopt(argc, argv, "f:Bs")) != -1) {
-        switch (opt) {
-            case 'f':
-				filename = optarg;
-                break;
-            case 'B':
-                fB = TRUE;
-                break;
-            case 's':
-                sC = TRUE;
-                break;
-            case '?':
-                printf("Unknown flag..\n");
-                break;
-            default:
-                printf("Error\n");
-                return -1;
-        }
-    }
+	if(parse_commandline(argc, argv, &filename, &silence_commands, &force_build) == -1) {
+		exit(EXIT_FAILURE);
+	}
 
 	// Open a specified makefile, or open default
 	fp = fopen(filename, "r");
@@ -80,7 +69,7 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
-	// Parse the makefile
+	// Parse makefile
 	if((mmakefile = parse_makefile(fp)) == NULL) {
 		fprintf(stderr, "%s: Could not parse makefile\n", filename);
 		fclose(fp);
@@ -89,11 +78,9 @@ int main(int argc, char *argv[]) {
 
 	// Handle specified target, or default target
 	int target_specified = FALSE;
-
-	// Handle specified targets
 	for(int i = optind; i < argc ; i++) {
 		target_specified = TRUE;
-		if(handle_target(argv[i], mmakefile, fB, sC, fp) == 1) {
+		if(handle_target(argv[i], mmakefile, force_build, silence_commands, fp) == 1) {
 			makefile_del(mmakefile);
 			fclose(fp);
 			exit(EXIT_FAILURE);
@@ -103,7 +90,7 @@ int main(int argc, char *argv[]) {
 	// If no specified targets, build the default target
 	if(!target_specified) {
 		defaultTarget = makefile_default_target(mmakefile);
-		if(handle_target(defaultTarget, mmakefile, fB, sC, fp) == 1) {
+		if(handle_target(defaultTarget, mmakefile, force_build, silence_commands, fp) == 1) {
 			makefile_del(mmakefile);
 			fclose(fp);
 			exit(EXIT_FAILURE);
@@ -114,4 +101,40 @@ int main(int argc, char *argv[]) {
 	makefile_del(mmakefile);
 	fclose(fp);
     return 0;
+}
+
+/* -------------------------- Internal functions -------------------------- */
+/**
+ * Parses the commandline arguments
+ *
+ * @param argc				Number of arguments
+ * @param argv				Argument vector
+ * @param filename			Name of the file
+ * @param force_build		Default to FALSE, if -B flag is found, forcebuild will be
+ *							set to TRUE
+ * @param silence_commands	Default to FALSE, if -s flag is found, silence_commands
+ *							will be set to TRUE
+ * @Return					0 on success, otherwise -1
+ */
+static int parse_commandline(int argc, char **argv, char **filename, int *force_build, int *silence_commands) {
+    int opt;
+    while((opt = getopt(argc, argv, "f:Bs")) != -1) {
+        switch (opt) {
+            case 'f':
+				*filename = strdup(optarg);
+                break;
+            case 'B':
+                *force_build = TRUE;
+                break;
+            case 's':
+                *silence_commands = TRUE;
+                break;
+            case '?':
+                printf("Unknown flag..\n");
+                break;
+            default:
+                return -1;
+        }
+    }
+	return 0;
 }

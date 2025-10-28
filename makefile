@@ -7,9 +7,9 @@ mmake: mmake.o parser.o target.o
 mmake.o: mmake.c parser.h target.h
 	$(cc) $(cFlags) -c mmake.c
 
-parser.o: parser.c
+parser.o: parser.c parser.h
 	$(cc) $(cFlags) -c parser.c
 
-target.o: target.c
+target.o: target.c parser.h
 	$(cc) $(cFlags) -c target.c
 

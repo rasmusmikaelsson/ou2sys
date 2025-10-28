@@ -29,11 +29,11 @@
 static int updated_prereq(const char *target, const char **rule_prereq);
 static int exec_args(char **args);
 static int file_exists(const char *target);
-static int rebuild_target(char **args, int sC);
+static int rebuild_target(char **args, int silence_commandes);
 
 /* -------------------------- External functions -------------------------- */
 
-int handle_target(const char *target, makefile *mmakefile, int fB, int sC, FILE *fp) {
+int handle_target(const char *target, makefile *mmakefile, int force_build, int silence_commandes, FILE *fp) {
 	rule *currentRule = makefile_rule(mmakefile, target);
 	
 	if(currentRule == NULL) {
@@ -49,7 +49,7 @@ int handle_target(const char *target, makefile *mmakefile, int fB, int sC, FILE 
 	// Loop through prerequisites and recursively handle each one
 	int index = 0;
 	while(current_rule_prereq[index] != NULL) {
-		if(handle_target(current_rule_prereq[index], mmakefile, fB, sC, fp) == 1) {
+		if(handle_target(current_rule_prereq[index], mmakefile, force_build, silence_commandes, fp) == 1) {
 			return 1;
 		}
 		index++;
@@ -62,8 +62,8 @@ int handle_target(const char *target, makefile *mmakefile, int fB, int sC, FILE 
 
 	// Build project based parameters
 	char **args = rule_cmd(currentRule);
-	if(!file_exists(target) || fB || is_updated_prereq) {
-		if(rebuild_target(args, sC) == 1) {
+	if(!file_exists(target) || force_build || is_updated_prereq) {
+		if(rebuild_target(args, silence_commandes) == 1) {
 			return 1;
 		}
 	}
@@ -146,16 +146,16 @@ static int updated_prereq(const char *target, const char **rule_prereq) {
 /**
  * Rebuilds a given target by executing it's commands.
  *
- *  @param args		Argument list for the rebuild command.
- *  @param sC		Silence flag. If true, suppresses command output.
- *  @return			0 if the target is rebuilt successfully, otherwise 1
+ *  @param args					Argument list for the rebuild command.
+ *  @param silence_commandes	Silence flag. If true, suppresses command output.
+ *  @return						0 if the target is rebuilt successfully, otherwise 1
  */
-static int rebuild_target(char **args, int sC) {
+static int rebuild_target(char **args, int silence_commandes) {
 	pid_t pid;
 	int status;
 	
 	// Silence commands handling
-	if(!sC) {
+	if(!silence_commandes) {
 		int index = 0;
 		while(args[index] != NULL) {
 			printf("%s", args[index]);
