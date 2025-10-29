@@ -35,7 +35,6 @@ static int rebuild_target(char **args, int silence_commandes);
 
 int handle_target(const char *target, makefile *mmakefile, int force_build, int silence_commandes, FILE *fp) {
 	rule *currentRule = makefile_rule(mmakefile, target);
-	
 	if(currentRule == NULL) {
 		if(!file_exists(target)) {
 			fprintf(stderr, "%s: is not a file\n", target);
@@ -44,18 +43,17 @@ int handle_target(const char *target, makefile *mmakefile, int force_build, int 
 		return 0;
 	}
 	
-	const char **current_rule_prereq = rule_prereq(currentRule);
-
 	// Loop through prerequisites and recursively handle each one
+	const char **current_rule_prereqs = rule_prereq(currentRule);
 	int index = 0;
-	while(current_rule_prereq[index] != NULL) {
-		if(handle_target(current_rule_prereq[index], mmakefile, force_build, silence_commandes, fp) == 1) {
+	while(current_rule_prereqs[index] != NULL) {
+		if(handle_target(current_rule_prereqs[index], mmakefile, force_build, silence_commandes, fp) == 1) {
 			return 1;
 		}
 		index++;
 	}
 	
-	int is_updated_prereq = updated_prereq(target, current_rule_prereq);
+	int is_updated_prereq = updated_prereq(target, current_rule_prereqs);
 	if(is_updated_prereq == 2) {
 		return 1;
 	}
@@ -118,7 +116,6 @@ static int updated_prereq(const char *target, const char **rule_prereq) {
 	}
 	
 	if(stat(target, &target_mtime) == -1) {
-		printf("target stat failed\n");
 		perror("stat failed");
 		return 2;
 	}
@@ -130,7 +127,6 @@ static int updated_prereq(const char *target, const char **rule_prereq) {
 			return 1;
 		}
 		if(stat(rule_prereq[index], &prereq_mtime) == -1) {
-			printf("prereq stat failed\n");
 			perror("stat failed");
 			return 2;
 		}
@@ -167,7 +163,7 @@ static int rebuild_target(char **args, int silence_commandes) {
 		printf("\n");
 	}
 
-	// Forking a new process
+	// Fork a new process
 	pid = fork();
 	if(pid < 0) {
 		perror("Fork failed");
