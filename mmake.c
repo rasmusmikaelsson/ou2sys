@@ -35,10 +35,6 @@
 #define FALSE 0;
 #define TRUE 1;
 
-/* ------------------ Declarations of internal functions ------------------ */
-
-static int parse_commandline(int argc, char **argv, char **filename, int *silence_commands, int *force_build);
-
 /* -------------------------- External functions -------------------------- */
 
 /**
@@ -56,11 +52,28 @@ int main(int argc, char **argv) {
     makefile *mmakefile;
 	char *filename = "mmakefile";
     const char *defaultTarget;
+	int opt;
 
 	// Parse commandline options
-	if(parse_commandline(argc, argv, &filename, &silence_commands, &force_build) == -1) {
-		exit(EXIT_FAILURE);
-	}
+    while((opt = getopt(argc, argv, "f:Bs")) != -1) {
+        switch (opt) {
+            case 'f':
+				filename = optarg;
+                break;
+            case 'B':
+                force_build = TRUE;
+                break;
+            case 's':
+                silence_commands = TRUE;
+                break;
+            case '?':
+                printf("Unknown flag..\n");
+                break;
+            default:
+                printf("Error\n");
+                return -1;
+        }
+    }
 
 	// Open a specified makefile, or open default
 	fp = fopen(filename, "r");
@@ -101,40 +114,4 @@ int main(int argc, char **argv) {
 	makefile_del(mmakefile);
 	fclose(fp);
     return 0;
-}
-
-/* -------------------------- Internal functions -------------------------- */
-/**
- * Parses the commandline arguments
- *
- * @param argc				Number of arguments
- * @param argv				Argument vector
- * @param filename			Name of the file
- * @param force_build		Default to FALSE, if -B flag is found, forcebuild will be
- *							set to TRUE
- * @param silence_commands	Default to FALSE, if -s flag is found, silence_commands
- *							will be set to TRUE
- * @Return					0 on success, otherwise -1
- */
-static int parse_commandline(int argc, char **argv, char **filename, int *force_build, int *silence_commands) {
-    int opt;
-    while((opt = getopt(argc, argv, "f:Bs")) != -1) {
-        switch (opt) {
-            case 'f':
-				*filename = strdup(optarg);
-                break;
-            case 'B':
-                *force_build = TRUE;
-                break;
-            case 's':
-                *silence_commands = TRUE;
-                break;
-            case '?':
-                printf("Unknown flag..\n");
-                break;
-            default:
-                return -1;
-        }
-    }
-	return 0;
 }
